@@ -677,3 +677,31 @@ body, .app { background: #f9d0ce; }
 .is-dramatic .result-tear--right,
 .cat-catcher.is-hurt .result-tear--right { animation-delay: -.4s; }
 @keyframes eyeTear { 0%, 100% { opacity: .85; transform: translateX(-50%) scaleY(.7); } 50% { opacity: 1; transform: translateX(-50%) scaleY(1.3); } }
+
+/* Player sign-up before the first round. */
+.screen--register { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 9rem 1.25rem 1.5rem; overflow-y: auto; }
+.register-form { width: min(100%, 340px); display: grid; gap: .85rem; }
+.register-form h2 { color: var(--ink); font-size: clamp(1.9rem, 8vw, 2.4rem); text-align: center; }
+.register-copy { margin: -.25rem 0 .2rem; font-size: .95rem; font-weight: 600; line-height: 1.4; text-align: center; }
+.field { display: grid; gap: .3rem; font-size: .74rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.field input { width: 100%; min-height: 48px; border: 2px solid #ffffff; border-radius: 11px; padding: .7rem .85rem; background: #ffffff; color: var(--ink); font: inherit; font-size: 1rem; font-weight: 600; letter-spacing: normal; text-transform: none; }
+.field input::placeholder { color: rgba(116, 121, 75, .5); }
+.field input:focus-visible { outline: 3px solid var(--pink); outline-offset: 1px; }
+.field input[aria-invalid="true"] { border-color: #b3263e; }
+.consent { display: flex; align-items: flex-start; gap: .55rem; font-size: .8rem; font-weight: 600; line-height: 1.4; cursor: pointer; }
+.consent input { flex: none; width: 20px; height: 20px; margin: .05rem 0 0; accent-color: var(--pink); }
+.consent input[aria-invalid="true"] { outline: 2px solid #b3263e; outline-offset: 2px; }
+.form-error { margin: 0; color: #b3263e; font-size: .85rem; font-weight: 700; line-height: 1.35; text-align: center; }
+.form-error:empty { display: none; }
+.button:disabled { cursor: wait; opacity: .7; transform: none; }
+
+/* "You have played" popup for repeat players. */
+.played-dialog { width: min(92vw, 380px); border: 0; border-radius: 22px; padding: 2rem 1.5rem 1.6rem; background: #f9d0ce; color: var(--ink); text-align: center; }
+.played-dialog[open] { display: grid; justify-items: center; }
+.played-dialog::backdrop { background: rgba(76, 46, 51, .48); backdrop-filter: blur(3px); }
+.played-dialog h2 { margin: .45rem 0 .55rem; color: var(--ink); font-size: clamp(1.9rem, 8vw, 2.3rem); }
+.played-copy { margin: 0 0 1rem; font-weight: 600; line-height: 1.4; }
+.played-dialog .final-score { width: 100%; background: #ffffff; }
+.played-prize { margin: .9rem 0 0; font-weight: 800; }
+.played-prize:empty { display: none; }
+.played-dialog .button { width: 100%; min-height: 48px; margin-top: 1.2rem; }

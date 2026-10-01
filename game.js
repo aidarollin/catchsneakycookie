@@ -25,9 +25,13 @@
     let draw = Math.random() * total;
     const prize = LUCKY_PRIZES.find((entry) => (draw -= entry.weight) < 0);
     document.querySelector("#gift-prize").textContent = prize.name;
+    reportPrize(prize.name);
   });
   // Leave blank to keep the in-game cookie shelf. Add a verified shop URL later to make the result CTA external.
   const COOKIE_SHOP_URL = "";
+  // Google Apps Script web app URL (see backend/SETUP.md). Leave blank to play without saving players.
+  // The one-play-per-phone switch lives in the sheet's Settings tab, not here.
+  const PLAYER_API_URL = "https://script.google.com/macros/s/AKfycbwm6d3_SQ-e3_1pt_DFeyDHuo1KancwWuG0O8VPFm-1uZ9FkQMxr5QhMSmNFE_vYA1C/exec";
 
   const CATS = [
     { id: "tam", name: "Tam", label: "black cat", source: "assets/cats/tam.svg", spriteX: "0%", spriteY: "0%" },
@@ -74,6 +78,13 @@
   const resultCopy = document.querySelector("#result-copy");
   const resultScore = document.querySelector("#result-score");
   const soundButtons = [...document.querySelectorAll("[data-sound-toggle]")];
+  const registerForm = document.querySelector("#register-form");
+  const registerButton = document.querySelector("#register-button");
+  const registerError = document.querySelector("#register-error");
+  const playedDialog = document.querySelector("#played-dialog");
+
+  // Set after sign-up. playRequest resolves to the server's id for the current round ("" when unsaved).
+  let player = null;
 
   const game = {
     selected: CATS[0],
@@ -249,10 +260,23 @@
   }
 
   function startRound() {
+    if (!player) {
+      showScreen("register");
+      return;
+    }
+    if (player.onePlayOnly && player.hasPlayed) {
+      showPlayedDialog(player.lastScore, player.prize);
+      return;
+    }
     resetRound();
     showScreen("game");
     playSound("click");
     const token = game.token;
+    player.hasPlayed = true;
+    player.lastScore = 0;
+    player.prize = "";
+    player.playRequest = reportRoundStart(token);
+    player.scoreRequest = player.playRequest;
     runCountdown(token);
   }
 
@@ -503,6 +527,7 @@
     resultCopy.textContent = dramaticResultCopy(cat, gameOver);
     resultScore.textContent = String(game.score).padStart(3, "0");
     if (gameOver) playSound("gameover"); else playSound("timeup");
+    reportScore(game.score, reason);
     showScreen("result");
     if (game.score >= GIFT_THRESHOLD) {
       giftOpen.disabled = false;
@@ -643,6 +668,146 @@
       stopMusic();
     }
   }
+
+  async function callPlayerApi(action, data) {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 15000);
+    try {
+      // text/plain keeps this a "simple" request, which Apps Script accepts cross-origin.
+      const response = await fetch(PLAYER_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ action, ...data }),
+        signal: controller.signal
+      });
+      const result = await response.json();
+      if (!result.ok) throw new Error(result.error || "request_failed");
+      return result;
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  }
+
+  function normalizePhone(raw) {
+    const trimmed = raw.trim();
+    const digits = trimmed.replace(/\D/g, "");
+    // Local Malaysian numbers (012…) become 6012… so every phone is stored the same way.
+    return !trimmed.startsWith("+") && digits.startsWith("0") ? `6${digits}` : digits;
+  }
+
+  function isValidPhone(phone) {
+    if (phone.startsWith("60")) return /^601\d{8,9}$/.test(phone);
+    return /^\d{9,15}$/.test(phone);
+  }
+
+  function readRegistration() {
+    const fields = {
+      name: document.querySelector("#player-name"),
+      phone: document.querySelector("#player-phone"),
+      email: document.querySelector("#player-email"),
+      consent: document.querySelector("#player-consent")
+    };
+    const details = {
+      name: fields.name.value.trim().replace(/\s+/g, " "),
+      phone: normalizePhone(fields.phone.value),
+      email: fields.email.value.trim().toLowerCase()
+    };
+    const problems = [
+      [fields.name, !details.name, "Please enter your name."],
+      [fields.phone, !isValidPhone(details.phone), "Please enter a valid mobile number, e.g. 012-345 6789."],
+      [fields.email, !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(details.email), "Please enter a valid email address."],
+      [fields.consent, !fields.consent.checked, "Please tick the box to agree before playing."]
+    ];
+    problems.forEach(([field, invalid]) => field.setAttribute("aria-invalid", String(invalid)));
+    const firstProblem = problems.find(([, invalid]) => invalid);
+    registerError.textContent = firstProblem ? firstProblem[2] : "";
+    if (firstProblem) {
+      firstProblem[0].focus();
+      return null;
+    }
+    return details;
+  }
+
+  async function handleRegister(event) {
+    event.preventDefault();
+    const details = readRegistration();
+    if (!details) return;
+    registerButton.disabled = true;
+    registerButton.textContent = "CHECKING…";
+    try {
+      const result = PLAYER_API_URL ? await callPlayerApi("register", details) : { status: "ok", onePlayOnly: false };
+      if (result.status === "played") {
+        showPlayedDialog(result.score, result.prize, details.name);
+        return;
+      }
+      player = { ...details, onePlayOnly: result.onePlayOnly, hasPlayed: false, lastScore: 0, prize: "", playRequest: Promise.resolve(""), scoreRequest: Promise.resolve("") };
+      registerForm.reset();
+      goTo("select");
+    } catch {
+      registerError.textContent = "We couldn't reach the cookie counter. Check your connection and try again.";
+    } finally {
+      registerButton.disabled = false;
+      registerButton.textContent = "LET'S PLAY!";
+    }
+  }
+
+  async function reportRoundStart(token) {
+    if (!PLAYER_API_URL) return "";
+    try {
+      const result = await callPlayerApi("start", { phone: player.phone, cat: currentCat().name });
+      if (result.status === "played") {
+        // Already played elsewhere (another tab or device): cancel this round.
+        player.onePlayOnly = true;
+        player.lastScore = result.score;
+        player.prize = result.prize;
+        if (token === game.token && game.screen === "game") {
+          stopRound();
+          showScreen("select");
+        }
+        showPlayedDialog(result.score, result.prize);
+        return "";
+      }
+      player.onePlayOnly = result.onePlayOnly;
+      return result.playId;
+    } catch {
+      // Keep the round playable if the network drops; this round just won't be saved.
+      return "";
+    }
+  }
+
+  function reportScore(score, reason) {
+    if (!player) return;
+    player.lastScore = score;
+    const playRequest = player.playRequest;
+    player.scoreRequest = playRequest.then(async (playId) => {
+      if (!playId) return "";
+      try {
+        await callPlayerApi("score", { playId, score, result: reason });
+      } catch {
+        // Score saving is best effort; the round result on screen is unaffected.
+      }
+      return playId;
+    });
+  }
+
+  function reportPrize(prizeName) {
+    if (!player) return;
+    player.prize = prizeName;
+    player.scoreRequest.then((playId) => {
+      if (playId) callPlayerApi("prize", { playId, prize: prizeName }).catch(() => {});
+    });
+  }
+
+  function showPlayedDialog(score, prizeName, name = player?.name) {
+    document.querySelector("#played-copy").textContent = name ? `Thanks for feeding the cats, ${name}.` : "Thanks for feeding the cats.";
+    document.querySelector("#played-score").textContent = String(score || 0).padStart(3, "0");
+    document.querySelector("#played-prize").textContent = prizeName ? `Your prize: ${prizeName}` : "";
+    if (giftDialog.open) giftDialog.close();
+    if (!playedDialog.open) playedDialog.showModal();
+  }
+
+  registerForm.addEventListener("submit", handleRegister);
+  document.querySelector("#played-close").addEventListener("click", () => playedDialog.close());
 
   document.querySelectorAll("[data-go]").forEach((button) => {
     button.addEventListener("click", () => goTo(button.dataset.go));

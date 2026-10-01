@@ -12,7 +12,21 @@
   <body>
     <main class="app" aria-live="polite">
       <section class="game-shell" aria-label="Sneaky Cat Cookie Drop">
-        <section class="screen screen--select screen--active" id="select-screen" aria-label="Choose your cat">
+        <section class="screen screen--register screen--active" id="register-screen" aria-labelledby="register-title">
+          <div class="select-brand"><img src="assets/brand/main-logo-pink.svg" alt="Sneaky Surprise" /></div>
+          <form class="register-form" id="register-form" novalidate>
+            <h2 id="register-title">READY TO PLAY?</h2>
+            <p class="register-copy">Tell us who's playing so we know where to send your prize.</p>
+            <label class="field"><span>Name</span><input id="player-name" type="text" autocomplete="name" maxlength="60" required /></label>
+            <label class="field"><span>Phone number</span><input id="player-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="012-345 6789" maxlength="20" required /></label>
+            <label class="field"><span>Email</span><input id="player-email" type="email" autocomplete="email" maxlength="120" placeholder="you@example.com" required /></label>
+            <label class="consent"><input id="player-consent" type="checkbox" required /><span>I agree that Sneaky Surprise may keep these details to contact me about my prize and promotions.</span></label>
+            <p class="form-error" id="register-error" role="alert"></p>
+            <button class="button button--primary button--play" type="submit" id="register-button">LET'S PLAY!</button>
+          </form>
+        </section>
+
+        <section class="screen screen--select" id="select-screen" aria-label="Choose your cat" hidden>
           <div class="select-brand"><img src="assets/brand/main-logo-pink.svg" alt="Sneaky Surprise" /></div>
           <div class="cat-grid" id="cat-grid" aria-label="Choose a cat"></div>
           <button class="button button--primary button--play" id="play-button" type="button">START!!!</button>
@@ -83,6 +97,14 @@
         <img class="gift-state gift-state--open" src="assets/brand/gift-open.svg" alt="" />
       </button>
       <p id="gift-prize" aria-live="polite"></p>
+    </dialog>
+    <dialog id="played-dialog" class="played-dialog" aria-labelledby="played-title">
+      <p class="eyebrow">ONE GAME PER PLAYER</p>
+      <h2 id="played-title">YOU HAVE PLAYED!</h2>
+      <p class="played-copy" id="played-copy">Thanks for feeding the cats.</p>
+      <div class="final-score"><span>This is your final score</span><strong id="played-score">000</strong></div>
+      <p class="played-prize" id="played-prize"></p>
+      <button class="button button--primary" type="button" id="played-close">OK</button>
     </dialog>
     <script src="game.js"></script>
   </body>
